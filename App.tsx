@@ -28,8 +28,7 @@ import {
 
 import { ibc, osmosis } from 'osmojs';
 import { PageRequest } from 'osmojs/dist/codegen/cosmos/base/query/v1beta1/pagination';
-import { Coin } from 'osmojs/dist/codegen/cosmos/base/v1beta1/coin';
-
+import { Pool as BalancerPool, PoolAsset } from 'osmojs/dist/codegen/osmosis/gamm/pool-models/balancer/balancerPool';
 
 type ItemProps = {title: string, subtitle: string};
 
@@ -46,57 +45,62 @@ interface Pool {
     address: string
 }
 
+const rpcEndpoint = 'https://rpc.testnet.osmosis.zone';
+const { createRPCQueryClient: createOsmoClient } = osmosis.ClientFactory;
+const { createRPCQueryClient: createIbcClient } = ibc.ClientFactory;
+
+async function getDenom(asset: PoolAsset, ibcClient) {
+    if (asset.token.denom.startsWith('ibc/')) {
+        const hash = asset.token.denom.substring(4);
+        const traceRes = await ibcClient.ibc.applications.transfer.v1.denomTrace({hash: hash});
+        return traceRes.denomTrace.baseDenom;
+    } else {
+        return asset.token.denom;
+    }
+}
+
 function App(): JSX.Element {
-  const { createRPCQueryClient } = osmosis.ClientFactory;
-  const [pools, setPools] = useState<Array<Pool>>([]);
-    
-  console.log("got here");
+    const [pools, setPools] = useState<Array<Pool>>([]);
 
     useEffect(() => {
         (async () => {
             try {
                 console.log("fetching pools");
-                const client = await createRPCQueryClient({rpcEndpoint: 'https://rpc.osmosis.zone'})
-                const response = await client.osmosis.gamm.v1beta1.pools();
-                const ibcClient = await ibc.ClientFactory.createRPCQueryClient({rpcEndpoint: 'https://rpc.osmosis.zone'})
                 
+                const client = await createOsmoClient({rpcEndpoint: rpcEndpoint})
+                const ibcClient = await createIbcClient({rpcEndpoint: rpcEndpoint})
+                
+                const poolRes = await client.osmosis.gamm.v1beta1.pools({
+                    pagination: PageRequest.fromPartial({
+                        limit: 5n
+                    })
+                });
+
+                console.log(poolRes.pools)
+
                 let pools: Array<Pool> = [];
                 
-                for (let i = 0; i < 10; i++) {
-                    const pool = response.pools[i];
-                    const asset1 = pool.poolAssets[0];
-                    const asset2 = pool.poolAssets[1];
-                                        
-                    let denom1 = asset1.token.denom;
-                    let denom2 = asset2.token.denom;
+                for (const pool of poolRes.pools) {
+                    const balancePool = pool as BalancerPool;
+                    const asset1 = balancePool.poolAssets[0];
+                    const asset2 = balancePool.poolAssets[1];
 
-                    if (asset1.token.denom.startsWith('ibc/')) {
-                        const hash = asset1.token.denom.substr(4);
-                        const traceRes = await ibcClient.ibc.applications.transfer.v1.denomTrace({hash: hash})
-                        denom1 = traceRes.denomTrace.baseDenom
-                    }
-
-                    if (asset2.token.denom.startsWith('ibc/')) {
-                        const hash = asset2.token.denom.substr(4);
-                        const traceRes = await ibcClient.ibc.applications.transfer.v1.denomTrace({hash: hash})
-                        denom2 = traceRes.denomTrace.baseDenom
-                    }
+                    let denom1 = await getDenom(asset1, ibcClient);
+                    let denom2 = await getDenom(asset2, ibcClient);
 
                     pools.push({
                         asset1: denom1,
                         asset2: denom2,
-                        address: pool.address
+                        address: balancePool.address
                     })
                 }
-
-                console.log(response.pools[0]);
                 
                 setPools(pools)
             } catch(error) {
                 console.log(error);
             }
         })()
-  });
+  }, []);
 
   const isDarkMode = useColorScheme() === 'dark';
 
