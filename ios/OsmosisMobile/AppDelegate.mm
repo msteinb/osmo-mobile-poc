@@ -1,6 +1,8 @@
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <React/RCTLog.h>
+#import <Contacts/Contacts.h>
 
 @implementation AppDelegate
 
@@ -11,6 +13,16 @@
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
+  CNAuthorizationStatus status = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
+  if (status == CNAuthorizationStatusNotDetermined) {
+    [[[CNContactStore alloc] init]
+      requestAccessForEntityType:CNEntityTypeContacts
+      completionHandler:^(BOOL granted, NSError * _Nullable error)
+    {
+      RCTLogInfo(@"granted access to contacts");
+    }];
+  };
+  
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
 
