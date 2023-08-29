@@ -2,7 +2,7 @@
 
 This is a POC of a react native app that connects with Osmosis using osmojs.
 
-Note, osmojs has a dependency on node's crypto module which unavailble on mobile devices. This project uses react-native-quick-crypto as an alternative.
+Note, osmojs has a dependency on node's crypto module which is unavailble on mobile devices. This project uses react-native-quick-crypto as an alternative.
 
 --- 
 
